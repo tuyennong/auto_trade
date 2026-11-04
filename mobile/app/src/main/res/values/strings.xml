@@ -23,6 +23,9 @@
     <string name="no_data">Chưa có dữ liệu</string>
 
     <string name="account_demo">TÀI KHOẢN DEMO</string>
+    <string name="account_mt5_demo">TÀI KHOẢN MT5 DEMO</string>
+    <string name="terminal_manage_account">Quản lý</string>
+    <string name="terminal_realtime_note">Số dư cập nhật mỗi giây · dữ liệu tổng hợp</string>
     <string name="balance">Số dư</string>
     <string name="equity">Equity</string>
     <string name="margin">Ký quỹ</string>
@@ -179,6 +182,7 @@
     <string name="mt5_logout">Đăng xuất phiên MT5</string>
     <string name="mt5_logout_confirm">Đăng xuất phiên MT5 mô phỏng? Số dư, lịch sử và vị thế demo được giữ nguyên.</string>
     <string name="mt5_connected">Đang đăng nhập · %1$s</string>
+    <string name="mt5_connected_balance">Số dư %1$s %2$s · Equity %3$s</string>
     <string name="mt5_not_connected">Chưa đăng nhập · đang dùng demo cục bộ</string>
     <string name="mt5_invalid_login">Số tài khoản phải gồm 4–12 chữ số</string>
     <string name="mt5_invalid_server">Chọn máy chủ giao dịch</string>

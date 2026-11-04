@@ -5,10 +5,14 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
 import com.smclab.autotrade.data.AppRepository
 import com.smclab.autotrade.databinding.ActivityMainBinding
+import com.smclab.autotrade.model.Account
+import com.smclab.autotrade.ui.Ui
+import com.smclab.autotrade.ui.dialog.Mt5LoginDialog
 import com.smclab.autotrade.ui.dialog.SettingsDialog
 import com.smclab.autotrade.ui.fragment.BacktestFragment
 import com.smclab.autotrade.ui.fragment.ChartFragment
@@ -40,6 +44,8 @@ class MainActivity : AppCompatActivity() {
                 SettingsDialog().show(supportFragmentManager, "settings")
             }
         }
+        binding.btnAccount.setOnClickListener { openAccountDialog() }
+        binding.accountStrip.setOnClickListener { openAccountDialog() }
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             if (item.itemId != currentTab) openTab(item.itemId)
@@ -51,6 +57,8 @@ class MainActivity : AppCompatActivity() {
                 Snackbar.make(binding.root, message.text, Snackbar.LENGTH_SHORT).show()
             }
         }
+
+        AppRepository.account.observe(this) { renderAccountStrip(it) }
 
         val restored = savedInstanceState?.getInt(KEY_TAB, R.id.nav_markets) ?: R.id.nav_markets
         currentTab = restored
@@ -69,6 +77,33 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun openAccountDialog() {
+        if (supportFragmentManager.findFragmentByTag("mt5_login") == null) {
+            Mt5LoginDialog().show(supportFragmentManager, "mt5_login")
+        }
+    }
+
+    private fun renderAccountStrip(account: Account) {
+        val connected = account.isMt5Session
+        binding.tvStripLogin.text = if (connected) {
+            getString(R.string.account_strip_mt5, account.login, account.server)
+        } else {
+            getString(R.string.account_not_logged)
+        }
+        binding.tvStripLogin.setTextColor(
+            ContextCompat.getColor(this, if (connected) R.color.accent else R.color.text_dim),
+        )
+        binding.tvStripStatus.text = if (connected) {
+            getString(R.string.account_realtime)
+        } else {
+            getString(R.string.account_local_demo)
+        }
+        binding.tvStripBalance.text = Ui.money(account.balance)
+        binding.tvStripEquity.text = "Eq ${Ui.money(account.equity)}"
+        binding.tvStripFloating.text = Ui.signedMoney(account.floatingPl)
+        binding.tvStripFloating.setTextColor(Ui.profitColor(this, account.floatingPl))
     }
 
     fun openTab(itemId: Int) {
