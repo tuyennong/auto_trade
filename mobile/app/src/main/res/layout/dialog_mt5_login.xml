@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:overScrollMode="never"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/space_20"
+        android:paddingTop="@dimen/space_8"
+        android:paddingBottom="@dimen/space_20">
+
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/bg_sheet_handle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_14"
+            android:text="@string/mt5_login_title"
+            android:textColor="@color/text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/mt5_login_sub"
+            android:textColor="@color/text_muted"
+            android:textSize="10.5sp" />
+
+        <!-- Existing local session summary. Hidden when no session is active. -->
+        <LinearLayout
+            android:id="@+id/connected_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_14"
+            android:background="@drawable/bg_card_soft"
+            android:orientation="vertical"
+            android:padding="@dimen/space_12"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_mt5_connected_identity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="@color/accent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_mt5_connected_server"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/text_dim"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/tv_mt5_connected_balance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="monospace"
+                android:textColor="@color/text"
+                android:textSize="11sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mt5_logout"
+                style="@style/Widget.SmcTrader.Button.Outline"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="@dimen/space_10"
+                android:minHeight="44dp"
+                android:text="@string/mt5_logout"
+                android:textColor="@color/sell"
+                android:textSize="12sp"
+                app:strokeColor="@color/sell" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/login_form"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_12"
+            android:orientation="vertical">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_mt5_login"
+                style="@style/Widget.SmcTrader.TextInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/login">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_mt5_login"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:inputType="number"
+                    android:maxLength="12"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_mt5_password"
+                style="@style/Widget.SmcTrader.TextInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:hint="@string/password"
+                app:endIconMode="password_toggle">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_mt5_password"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_mt5_server"
+                style="@style/Widget.SmcTrader.TextInput.Dropdown"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:hint="@string/server">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/dd_mt5_server"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textNoSuggestions"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_mt5_broker"
+                style="@style/Widget.SmcTrader.TextInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:hint="@string/broker">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_mt5_broker"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapWords"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_10"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/mt5_login_note"
+            android:textColor="@color/text_muted"
+            android:textSize="9.5sp" />
+
+        <TextView
+            android:id="@+id/tv_mt5_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_6"
+            android:textColor="@color/sell"
+            android:textSize="10.5sp"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_mt5_connect"
+            style="@style/Widget.SmcTrader.Button"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="@dimen/space_12"
+            android:text="@string/mt5_connect"
+            app:backgroundTint="@color/primary"
+            app:icon="@drawable/ic_account"
+            app:iconGravity="textStart"
+            app:iconTint="@color/white" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_mt5_cancel"
+            style="@style/Widget.SmcTrader.Button.Outline"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="@dimen/space_8"
+            android:minHeight="46dp"
+            android:text="@string/cancel" />
+    </LinearLayout>
+</ScrollView>
