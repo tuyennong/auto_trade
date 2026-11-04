@@ -1,0 +1,493 @@
+"""
+Data Loader Module
+==================
+
+Handles data ingestion from MetaTrader 5 and CSV files, time-series aware
+splitting, and sequence creation for LSTM / transformer models.
+
+CSV loading is available without the optional MetaTrader5 package. A failed
+terminal connection raises an explicit error; callers can select a CSV path.
+"""
+
+from __future__ import annotations
+
+import csv
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# MetaTrader5 import with graceful fallback
+# ---------------------------------------------------------------------------
+try:
+    import MetaTrader5 as mt5
+
+    _MT5_AVAILABLE = True
+except ImportError:
+    _MT5_AVAILABLE = False
+    logger.debug("MetaTrader5 is unavailable; CSV loading remains available.")
+
+# ---------------------------------------------------------------------------
+# Timeframe mapping  (MQL5 enum value -> MT5 constant)
+# ---------------------------------------------------------------------------
+TIMEFRAME_MAP: Dict[str, int] = {
+    "M1": 1,
+    "M2": 2,
+    "M3": 3,
+    "M4": 4,
+    "M5": 5,
+    "M6": 6,
+    "M10": 10,
+    "M12": 12,
+    "M15": 15,
+    "M20": 20,
+    "M30": 30,
+    "H1": 16385,
+    "H2": 16386,
+    "H3": 16387,
+    "H4": 16388,
+    "H6": 16390,
+    "H8": 16392,
+    "H12": 16396,
+    "D1": 16408,
+    "W1": 32769,
+    "MN1": 49153,
+}
+
+# Reverse lookup for display purposes
+TIMEFRAME_NAME: Dict[int, str] = {v: k for k, v in TIMEFRAME_MAP.items()}
+
+
+def _resolve_mt5_timeframe(timeframe: Union[str, int]) -> int:
+    """Convert a string timeframe label to its MT5 integer constant.
+
+    Parameters
+    ----------
+    timeframe : str | int
+        Either a string like ``"M5"`` or the raw MT5 integer constant.
+
+    Returns
+    -------
+    int
+        The MT5 timeframe constant.
+
+    Raises
+    ------
+    ValueError
+        If the string is not recognised.
+    """
+    if isinstance(timeframe, int):
+        return timeframe
+    tf_upper = timeframe.upper()
+    if tf_upper not in TIMEFRAME_MAP:
+        raise ValueError(
+            f"Unknown timeframe '{timeframe}'. "
+            f"Valid options: {list(TIMEFRAME_MAP.keys())}"
+        )
+    return TIMEFRAME_MAP[tf_upper]
+
+
+def _validate_n_bars(n_bars: int) -> None:
+    if (
+        isinstance(n_bars, bool)
+        or not isinstance(n_bars, (int, np.integer))
+        or n_bars <= 0
+    ):
+        raise ValueError("n_bars must be a positive integer")
+
+
+def _validate_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize both sources to one chronological, validated OHLCV contract."""
+    df = df.copy()
+    df.columns = [str(column).strip().lower() for column in df.columns]
+    if df.columns.duplicated().any():
+        raise ValueError("Duplicate column names after normalization")
+    required = {"datetime", "open", "high", "low", "close"}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
+    if df.empty:
+        raise ValueError("OHLCV data must contain at least one row")
+    df["datetime"] = pd.to_datetime(df["datetime"], errors="raise")
+    if df["datetime"].isna().any():
+        raise ValueError("Timestamps must not be missing")
+    if df["datetime"].duplicated().any():
+        raise ValueError("Duplicate timestamps are not allowed")
+    for column in ("open", "high", "low", "close", "volume", "tick_volume", "real_volume"):
+        if column not in df:
+            continue
+        df[column] = pd.to_numeric(df[column], errors="raise")
+        if not np.isfinite(df[column].to_numpy(dtype=float)).all():
+            raise ValueError(f"{column} must contain finite numbers")
+        if column in ("volume", "tick_volume", "real_volume"):
+            if (df[column] < 0).any() or (df[column] % 1 != 0).any():
+                raise ValueError(f"{column} must contain non-negative integers")
+    invalid = (df["high"] < df[["open", "close", "low"]].max(axis=1)) | (
+        df["low"] > df[["open", "close", "high"]].min(axis=1)
+    )
+    if invalid.any():
+        raise ValueError("OHLC prices must satisfy low <= open/close <= high")
+    # Keep the exported column as well as the name used by existing ML scripts.
+    if "volume" in df and "tick_volume" in df:
+        if not (df["volume"] == df["tick_volume"]).all():
+            raise ValueError("volume and tick_volume aliases disagree")
+    elif "volume" in df:
+        df["tick_volume"] = df["volume"]
+    elif "tick_volume" in df:
+        df["volume"] = df["tick_volume"]
+    return df.sort_values("datetime", kind="stable").reset_index(drop=True)
+
+
+class DataLoader:
+    """Unified data loading interface for the OSS Library.
+
+    Supports MetaTrader 5 terminal (live / historical) and CSV files
+    exported by the MQL5 ``DataExporter`` include.
+
+    Examples
+    --------
+    >>> loader = DataLoader()
+    >>> df = loader.load_from_mt5("XAUUSD", "M1", 50000)
+    >>> train, val, test = loader.train_val_test_split(df)
+    """
+
+    def __init__(
+        self,
+        symbol: Optional[str] = None,
+        timeframe: Optional[Union[str, int]] = None,
+        csv_path: Optional[Union[str, Path]] = None,
+    ) -> None:
+        """Create a loader with defaults used by the training scripts."""
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.csv_path = Path(csv_path) if csv_path is not None else None
+
+    def load(
+        self,
+        n_bars: int,
+        start_date: Optional[datetime] = None,
+        csv_path: Optional[Union[str, Path]] = None,
+    ) -> pd.DataFrame:
+        """Load data using the instance defaults.
+
+        This keeps compatibility with training scripts that instantiate
+        ``DataLoader(symbol, timeframe)`` and then call ``load(n_bars)``.
+        CSV rows are sorted before selecting the most recent ``n_bars``.
+        ``start_date``, if supplied, is an inclusive upper time bound.
+        """
+        _validate_n_bars(n_bars)
+        path = Path(csv_path) if csv_path is not None else self.csv_path
+        if path is not None:
+            df = self.load_from_csv(path)
+            if start_date is not None:
+                # Match MT5 copy_rates_from: bars at or before this timestamp.
+                df = df.loc[df["datetime"] <= pd.Timestamp(start_date)]
+            if df.empty:
+                raise ValueError("No CSV bars at or before start_date")
+            return df.tail(n_bars).reset_index(drop=True)
+
+        if self.symbol is None or self.timeframe is None:
+            raise ValueError(
+                "symbol and timeframe are required when csv_path is not set"
+            )
+
+        return self.load_from_mt5(
+            self.symbol,
+            self.timeframe,
+            n_bars,
+            start_date=start_date,
+        )
+
+    # ------------------------------------------------------------------
+    # MT5 loading
+    # ------------------------------------------------------------------
+    @staticmethod
+    def load_from_mt5(
+        symbol: str,
+        timeframe: Union[str, int],
+        n_bars: int,
+        start_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """Load OHLCV data directly from a running MetaTrader 5 terminal.
+
+        Parameters
+        ----------
+        symbol : str
+            Instrument symbol, e.g. ``"XAUUSD"``.
+        timeframe : str | int
+            Timeframe label (``"M1"``, ``"H1"``, ...) or MT5 integer.
+        n_bars : int
+            Number of bars to request.
+        start_date : datetime, optional
+            If provided, return up to ``n_bars`` bars at or before this
+            timestamp (the MT5 ``copy_rates_from`` convention). Otherwise
+            request the most recent ``n_bars`` completed bars.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: ``datetime, open, high, low, close, tick_volume,
+            spread, real_volume``.
+
+        Raises
+        ------
+        RuntimeError
+            If the MT5 package is missing or the terminal cannot be reached.
+        """
+        _validate_n_bars(n_bars)
+        tf = _resolve_mt5_timeframe(timeframe)
+        if not symbol or not symbol.strip():
+            raise ValueError("symbol must not be empty")
+        if not _MT5_AVAILABLE:
+            raise RuntimeError(
+                "MetaTrader5 package is not installed. "
+                "Install it with: pip install MetaTrader5"
+            )
+
+        if not mt5.initialize():
+            raise RuntimeError(
+                f"MT5 initialize() failed – error {mt5.last_error()}"
+            )
+
+        try:
+            if start_date is not None:
+                rates = mt5.copy_rates_from(symbol, tf, start_date, n_bars)
+            else:
+                rates = mt5.copy_rates_from_pos(symbol, tf, 1, n_bars)
+
+            if rates is None or len(rates) == 0:
+                raise RuntimeError(
+                    f"No data returned for {symbol} {timeframe}. "
+                    f"MT5 error: {mt5.last_error()}"
+                )
+
+            df = pd.DataFrame(rates)
+            df["datetime"] = pd.to_datetime(df["time"], unit="s")
+            df.drop(columns=["time"], inplace=True)
+
+            df = _validate_frame(df).tail(n_bars).reset_index(drop=True)
+
+            logger.info(
+                "Loaded %d bars for %s %s from MT5",
+                len(df),
+                symbol,
+                TIMEFRAME_NAME.get(tf, str(tf)),
+            )
+            return df
+
+        finally:
+            mt5.shutdown()
+
+    # ------------------------------------------------------------------
+    # CSV loading
+    # ------------------------------------------------------------------
+    @staticmethod
+    def load_from_csv(filepath: Union[str, Path]) -> pd.DataFrame:
+        """Load OHLCV data from a CSV file (MQL5 DataExporter format).
+
+        The CSV is expected to have a header row with at least:
+        ``datetime, open, high, low, close``.  Additional columns such as
+        ``tick_volume``, ``spread``, ``real_volume`` are preserved if present.
+        UTF-8 and BOM-marked legacy UTF-16 files are supported. Rows are
+        sorted chronologically; duplicate timestamps and invalid OHLC/volume
+        values raise ``ValueError``. Both ``volume`` and ``tick_volume`` aliases
+        are provided when either is present.
+
+        Parameters
+        ----------
+        filepath : str | Path
+            Path to the CSV file.
+
+        Returns
+        -------
+        pd.DataFrame
+            Parsed data with ``datetime`` as a proper datetime column.
+        """
+        filepath = Path(filepath)
+        if not filepath.exists():
+            raise FileNotFoundError(f"CSV file not found: {filepath}")
+
+        # Legacy MQL FILE_UNICODE exports carry a UTF-16 BOM. New exports
+        # use UTF-8; utf-8-sig also accepts a BOM from external CSV tools.
+        with filepath.open("rb") as stream:
+            prefix = stream.read(2)
+        encoding = "utf-16" if prefix in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
+        # pandas otherwise silently renames repeated headers (open -> open.1).
+        with filepath.open(encoding=encoding, newline="") as stream:
+            headers = next(csv.reader(stream), [])
+        normalized = [column.strip().lower() for column in headers]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("Duplicate column names after normalization")
+        df = pd.read_csv(filepath, encoding=encoding)
+
+        # Normalise column names
+        df.columns = [c.strip().lower() for c in df.columns]
+
+        # Parse datetime
+        if "datetime" in df.columns:
+            df["datetime"] = pd.to_datetime(df["datetime"])
+        elif "date" in df.columns and "time" in df.columns:
+            df["datetime"] = pd.to_datetime(
+                df["date"].astype(str) + " " + df["time"].astype(str)
+            )
+            df.drop(columns=["date", "time"], inplace=True)
+        elif "time" in df.columns:
+            df["datetime"] = pd.to_datetime(df["time"])
+            df.drop(columns=["time"], inplace=True)
+        df = _validate_frame(df)
+        logger.info("Loaded %d rows from %s", len(df), filepath.name)
+        return df
+
+    # ------------------------------------------------------------------
+    # Multi-symbol loading
+    # ------------------------------------------------------------------
+    @staticmethod
+    def load_multi_symbol(
+        symbols: List[str],
+        timeframe: Union[str, int],
+        n_bars: int,
+    ) -> Dict[str, pd.DataFrame]:
+        """Load data for multiple symbols from MetaTrader 5.
+
+        Parameters
+        ----------
+        symbols : list[str]
+            List of instrument symbols.
+        timeframe : str | int
+            Common timeframe for all symbols.
+        n_bars : int
+            Number of bars per symbol.
+
+        Returns
+        -------
+        dict[str, pd.DataFrame]
+            Mapping ``symbol -> DataFrame``.
+        """
+        result: Dict[str, pd.DataFrame] = {}
+        for sym in symbols:
+            try:
+                result[sym] = DataLoader.load_from_mt5(sym, timeframe, n_bars)
+            except RuntimeError as exc:
+                logger.error("Failed to load %s: %s", sym, exc)
+        return result
+
+    # ------------------------------------------------------------------
+    # Time-series splitting
+    # ------------------------------------------------------------------
+    @staticmethod
+    def train_val_test_split(
+        df: pd.DataFrame,
+        train_ratio: float = 0.70,
+        val_ratio: float = 0.15,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Split a DataFrame chronologically into train / val / test.
+
+        Unlike ``sklearn.train_test_split``, this preserves temporal order
+        which is critical for time-series data to prevent look-ahead bias.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Full dataset (must already be sorted by time).
+        train_ratio : float
+            Fraction of rows for training.  Default ``0.70``.
+        val_ratio : float
+            Fraction of rows for validation.  Default ``0.15``.
+            The remainder goes to the test set.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+            ``(train, val, test)`` DataFrames with reset indices.
+        """
+        if not (0.0 < train_ratio < 1.0 and 0.0 < val_ratio < 1.0
+                and train_ratio + val_ratio < 1.0):
+            raise ValueError("Split ratios must be positive and sum to less than one")
+        n = len(df)
+        train_end = int(n * train_ratio)
+        val_end = int(n * (train_ratio + val_ratio))
+
+        train = df.iloc[:train_end].reset_index(drop=True)
+        val = df.iloc[train_end:val_end].reset_index(drop=True)
+        test = df.iloc[val_end:].reset_index(drop=True)
+
+        logger.info(
+            "Split %d rows -> train=%d, val=%d, test=%d",
+            n,
+            len(train),
+            len(val),
+            len(test),
+        )
+        return train, val, test
+
+    # ------------------------------------------------------------------
+    # Sequence creation (LSTM / Transformer)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def create_sequences(
+        data: np.ndarray,
+        seq_length: int,
+        target_col: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Create sliding-window sequences for recurrent models.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            2-D array of shape ``(n_samples, n_features)``.
+        seq_length : int
+            Number of past time steps per input sample.
+        target_col : int
+            Column index used as the prediction target.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            ``X`` with shape ``(n_sequences, seq_length, n_features)`` and
+            ``y`` with shape ``(n_sequences,)``.
+        """
+        if data.ndim != 2:
+            raise ValueError(
+                f"Expected 2-D array, got shape {data.shape}"
+            )
+        if (
+            isinstance(seq_length, bool)
+            or not isinstance(seq_length, (int, np.integer))
+            or seq_length <= 0
+        ):
+            raise ValueError("seq_length must be a positive integer")
+        if (
+            isinstance(target_col, bool)
+            or not isinstance(target_col, (int, np.integer))
+            or not 0 <= target_col < data.shape[1]
+        ):
+            raise ValueError("target_col must be a valid non-negative column index")
+        if seq_length >= len(data):
+            raise ValueError(
+                f"seq_length ({seq_length}) must be less than "
+                f"data length ({len(data)})"
+            )
+
+        xs: List[np.ndarray] = []
+        ys: List[float] = []
+
+        for i in range(seq_length, len(data)):
+            xs.append(data[i - seq_length : i])
+            ys.append(data[i, target_col])
+
+        X = np.array(xs, dtype=np.float32)
+        y = np.array(ys, dtype=np.float32)
+
+        logger.info(
+            "Created %d sequences of length %d with %d features",
+            X.shape[0],
+            seq_length,
+            X.shape[2],
+        )
+        return X, y

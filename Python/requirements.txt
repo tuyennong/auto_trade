@@ -1,0 +1,6 @@
+# Compatibility install for all existing training entry points.
+# CSV-only users: pip install -r Python/requirements-data.txt
+# Model training: pip install -r Python/requirements-ml.txt
+# Optional Windows terminal connection: requirements-mt5.txt
+-r requirements-ml.txt
+-r requirements-mt5.txt

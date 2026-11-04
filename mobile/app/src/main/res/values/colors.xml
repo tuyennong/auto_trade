@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0A0E13</color>
+    <color name="surface">#111821</color>
+    <color name="surface_2">#17212C</color>
+    <color name="surface_3">#1E2A37</color>
+    <color name="stroke">#243140</color>
+    <color name="stroke_soft">#1A2430</color>
+
+    <color name="text">#E9F0F7</color>
+    <color name="text_dim">#96A6B8</color>
+    <color name="text_muted">#64758A</color>
+
+    <color name="primary">#2D9CDB</color>
+    <color name="primary_dark">#1A6FA3</color>
+    <color name="primary_soft">#1B3346</color>
+    <color name="accent">#00D1B2</color>
+    <color name="accent_soft">#0E3A36</color>
+
+    <color name="buy">#26A69A</color>
+    <color name="buy_soft">#123B38</color>
+    <color name="sell">#EF5350</color>
+    <color name="sell_soft">#3D1D1E</color>
+    <color name="warning">#F5A623</color>
+    <color name="warning_soft">#3D2E14</color>
+    <color name="purple">#9B7EDE</color>
+    <color name="purple_soft">#2A2340</color>
+
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="transparent">#00000000</color>
+</resources>
