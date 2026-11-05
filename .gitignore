@@ -48,10 +48,20 @@ desktop.ini
 # Data files (too large for git)
 *.csv
 data/
+# The Android repository package is source code, not market data.
+!mobile/app/src/main/java/com/smclab/autotrade/data/
+!mobile/app/src/main/java/com/smclab/autotrade/data/**
+
+# Android build output and local configuration
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/local.properties
 
 # Logs
 *.log
 logs/
+hs_err_pid*.log
 
 # Local validation reports (never copy success between commits)
 .validation/

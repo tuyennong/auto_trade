@@ -9,6 +9,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.smclab.autotrade.R
 import com.smclab.autotrade.data.AppRepository
 import com.smclab.autotrade.databinding.DialogSettingsBinding
+import com.smclab.autotrade.model.Account
 import java.util.Locale
 
 class SettingsDialog : BottomSheetDialogFragment() {
@@ -33,7 +34,14 @@ class SettingsDialog : BottomSheetDialogFragment() {
         binding.etSettingsRisk.setText(String.format(Locale.US, "%.2f", settings.defaultRisk))
         binding.etSettingsCommission.setText(String.format(Locale.US, "%.2f", settings.commissionPerLot))
         binding.tvSettingsAbout.text = getString(R.string.settings_about_body)
+        renderMt5Section()
 
+        binding.btnSettingsMt5.setOnClickListener {
+            dismiss()
+            if (parentFragmentManager.findFragmentByTag("mt5_login") == null) {
+                Mt5LoginDialog().show(parentFragmentManager, "mt5_login")
+            }
+        }
         binding.btnSettingsSave.setOnClickListener {
             val balance = binding.etSettingsBalance.text?.toString()?.toDoubleOrNull() ?: settings.initialBalance
             val leverage = binding.etSettingsLeverage.text?.toString()?.toIntOrNull() ?: settings.leverage
@@ -68,6 +76,23 @@ class SettingsDialog : BottomSheetDialogFragment() {
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.reset) { _, _ -> AppRepository.resetAccount() }
                 .show()
+        }
+    }
+
+    private fun renderMt5Section() {
+        val account = AppRepository.account.value ?: Account()
+        if (account.isMt5Session) {
+            binding.tvSettingsMt5Status.text = getString(R.string.mt5_connected, account.displayName)
+            binding.tvSettingsMt5Detail.text = buildString {
+                append(account.broker.ifBlank { "Broker demo" })
+                append(" · ").append(account.server)
+                append(" · ").append("Demo")
+            }
+            binding.btnSettingsMt5.setText(R.string.mt5_manage_action)
+        } else {
+            binding.tvSettingsMt5Status.text = getString(R.string.settings_mt5_logged_out)
+            binding.tvSettingsMt5Detail.text = getString(R.string.settings_mt5_hint)
+            binding.btnSettingsMt5.setText(R.string.mt5_login_action)
         }
     }
 

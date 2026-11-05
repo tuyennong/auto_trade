@@ -110,8 +110,7 @@ class EngineSmokeTest {
     }
 
     @Test
-    fun `diagnostic trade counts for default backtest`() {
-        val report = ArrayList<String>()
+    fun `every timeframe and strategy combination completes with finite metrics`() {
         for (tf in Timeframe.entries) {
             for (def in StrategyCatalog.all) {
                 val result = BacktestEngine.run(
@@ -128,10 +127,13 @@ class EngineSmokeTest {
                         htf = null,
                     ),
                 )
-                report.add("${tf.label}/${def.id}=${result.trades.size}")
+                val context = "${tf.label}/${def.id}"
+                assertEquals(context, def.id, result.strategyId)
+                assertEquals(context, tf, result.timeframe)
+                assertTrue("$context metrics", result.metrics.trades >= 0)
+                assertTrue("$context equity", result.equityCurve.all { it.isFinite() })
             }
         }
-        assertTrue(report.joinToString("\n"), false)
     }
 
     @Test

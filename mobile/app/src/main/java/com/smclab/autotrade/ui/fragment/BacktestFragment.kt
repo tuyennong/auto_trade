@@ -126,24 +126,31 @@ class BacktestFragment : Fragment() {
 
     private fun runBacktest() {
         if (_binding == null) return
-        val bars = binding.etBars.text?.toString()?.toIntOrNull() ?: 800
-        val balance = binding.etBalance.text?.toString()?.toDoubleOrNull() ?: 10_000.0
-        val risk = binding.etRisk.text?.toString()?.toDoubleOrNull() ?: 1.0
-        val rr = binding.etRr.text?.toString()?.toDoubleOrNull() ?: 2.0
-        if (bars !in 120..1_800) {
-            binding.etBars.error = "120 – 1800"
+        clearFieldErrors()
+
+        val bars = binding.etBars.text?.toString()?.trim()?.toIntOrNull()
+        val balance = binding.etBalance.text?.toString()?.trim()?.toDoubleOrNull()
+        val risk = binding.etRisk.text?.toString()?.trim()?.toDoubleOrNull()
+        val rr = binding.etRr.text?.toString()?.trim()?.toDoubleOrNull()
+
+        if (bars == null || bars !in 120..1_800) {
+            binding.etBars.error = getString(R.string.backtest_invalid_bars)
+            setStatus(getString(R.string.backtest_invalid_bars), isError = true)
             return
         }
-        if (balance < 100.0) {
-            binding.etBalance.error = "Tối thiểu 100 USD"
+        if (balance == null || !balance.isFinite() || balance < 100.0) {
+            binding.etBalance.error = getString(R.string.backtest_invalid_balance)
+            setStatus(getString(R.string.backtest_invalid_balance), isError = true)
             return
         }
-        if (risk !in 0.1..5.0) {
-            binding.etRisk.error = "0.1 – 5.0%"
+        if (risk == null || !risk.isFinite() || risk !in 0.1..5.0) {
+            binding.etRisk.error = getString(R.string.backtest_invalid_risk)
+            setStatus(getString(R.string.backtest_invalid_risk), isError = true)
             return
         }
-        if (rr !in 0.5..10.0) {
-            binding.etRr.error = "0.5 – 10.0"
+        if (rr == null || !rr.isFinite() || rr !in 0.5..10.0) {
+            binding.etRr.error = getString(R.string.backtest_invalid_rr)
+            setStatus(getString(R.string.backtest_invalid_rr), isError = true)
             return
         }
 
@@ -158,12 +165,14 @@ class BacktestFragment : Fragment() {
             riskPercent = risk,
             riskReward = rr,
             commissionPerLot = settings?.commissionPerLot ?: 7.0,
+            leverage = settings?.leverage ?: 200,
             htf = htf,
         )
 
         binding.backtestProgress.visibility = View.VISIBLE
         binding.btnRun.isEnabled = false
-        binding.tvBacktestStatus.text = getString(R.string.backtest_running)
+        binding.tvNoTrades.visibility = View.GONE
+        setStatus(getString(R.string.backtest_running_bars, bars))
 
         viewLifecycleOwner.lifecycleScope.launch {
             val outcome = withContext(Dispatchers.Default) {
@@ -173,13 +182,50 @@ class BacktestFragment : Fragment() {
             binding.backtestProgress.visibility = View.GONE
             binding.btnRun.isEnabled = true
             outcome.onSuccess { result ->
-                binding.tvBacktestStatus.text = getString(R.string.backtest_saved)
-                renderResult(result)
-                AppRepository.saveBacktest(result)
+                try {
+                    renderResult(result)
+                    AppRepository.saveBacktest(result)
+                    setStatus(
+                        getString(
+                            R.string.backtest_done,
+                            result.metrics.trades,
+                            Ui.signedMoney(result.metrics.netProfit),
+                        ),
+                        isError = false,
+                        colorRes = Ui.profitColor(requireContext(), result.metrics.netProfit),
+                    )
+                } catch (error: Exception) {
+                    setStatus(
+                        getString(
+                            R.string.backtest_failed,
+                            error.message ?: getString(R.string.error_generic),
+                        ),
+                        isError = true,
+                    )
+                }
             }.onFailure { error ->
-                binding.tvBacktestStatus.text = error.message ?: getString(R.string.error_generic)
+                setStatus(
+                    getString(
+                        R.string.backtest_failed,
+                        error.message ?: getString(R.string.error_generic),
+                    ),
+                    isError = true,
+                )
             }
         }
+    }
+
+    private fun clearFieldErrors() {
+        binding.etBars.error = null
+        binding.etBalance.error = null
+        binding.etRisk.error = null
+        binding.etRr.error = null
+    }
+
+    private fun setStatus(text: String, isError: Boolean = false, colorRes: Int? = null) {
+        binding.tvBacktestStatus.text = text
+        val color = colorRes ?: if (isError) R.color.sell else R.color.text_muted
+        binding.tvBacktestStatus.setTextColor(ContextCompat.getColor(requireContext(), color))
     }
 
     private fun renderResult(result: BacktestResult) {
@@ -197,6 +243,7 @@ class BacktestFragment : Fragment() {
         val shown = result.trades.takeLast(80).reversed()
         tradeAdapter.submitList(shown)
         binding.tvTradeCount.text = "${result.metrics.trades} lệnh"
+        binding.tvNoTrades.text = getString(R.string.backtest_no_trades)
         binding.tvNoTrades.visibility = if (shown.isEmpty()) View.VISIBLE else View.GONE
         binding.tvBacktestNote.text =
             "${result.dataNote} · ${if (result.htfTimeframe != null) "có xác nhận HTF" else "không xác nhận HTF"}"
