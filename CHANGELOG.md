@@ -14,6 +14,7 @@ Changes are recorded here before they are released. Entries describe completed w
 - Local commit validation covering Python, MQL5 static checks, MetaEditor compilation, detector runtime tests, language examples, and documentation links.
 - Shared Git hooks, commit-bound `local/validation` status publication, and contribution rules for small commits, frequent pushes, PR review, and squash merges into protected `main`.
 - Contributor conduct guidance, a private security reporting policy, and bug and feature request forms with reproducible environment and data requirements.
+- A dry-run-first MT5 auto-trade runner with broker-independent strategy and risk maths, hard risk guards, a kill switch, and documented measurements from real gold data.
 
 ### Changed
 

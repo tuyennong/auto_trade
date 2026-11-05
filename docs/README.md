@@ -7,6 +7,7 @@ The English guides below describe the current snapshot interface and project rul
 | Guide | Purpose |
 | --- | --- |
 | [Quick start](QUICKSTART.md) | Install in MT5, export results, run external readers, and choose Python dependencies |
+| [Live trading](LIVE_TRADING.md) | Connect a runner to a real MT5 terminal, dry-run first, and review the measured risk and doubling maths |
 | [Snapshot API](SNAPSHOT_API.md) | Configure the manager, retrieve typed results, and handle readiness |
 | [Detection rules](ICT_RULES.md) | Exact project definitions, defaults, confirmation, and lifecycle behavior |
 | [Data contract](DATA_CONTRACT.md) | JSON fields, schema versions, broker timestamps, and sample output |

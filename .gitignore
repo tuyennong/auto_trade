@@ -53,5 +53,8 @@ data/
 *.log
 logs/
 
+# Live trading kill switch
+STOP
+
 # Local validation reports (never copy success between commits)
 .validation/

@@ -15,6 +15,7 @@ Detection uses closed candles and broker time. Numerical rules are explicit, con
 | Data access | `SmcConfig`, `SmcSnapshot`, per-concept readiness, stable record IDs, lifecycle states, UTF-8 JSON, and existing CSV export |
 | Examples | A snapshot-export EA that places no orders; six external-language JSON readers; existing visualizer and sample trading EA |
 | Optional analysis | Currency strength, historical-volatility analysis, Python training scripts, and ONNX utilities |
+| Live trading | A dry-run-first Python runner and the sample EA for real MT5 execution; see [live trading](docs/LIVE_TRADING.md) |
 
 ## Start in MT5
 
