@@ -44,6 +44,14 @@ android {
         viewBinding = true
     }
 
+    testOptions {
+        unitTests.all {
+            it.maxHeapSize = "384m"
+            it.maxParallelForks = 1
+            it.jvmArgs("-XX:MaxMetaspaceSize=192m", "-XX:+UseSerialGC")
+        }
+    }
+
     packaging {
         resources.excludes += setOf(
             "META-INF/AL2.0",
