@@ -25,6 +25,8 @@ data class BacktestRequest(
     val riskPercent: Double,
     val riskReward: Double,
     val commissionPerLot: Double,
+    /** Account leverage used for the margin cap; mirrors the demo account setting. */
+    val leverage: Int = 200,
     /** Higher timeframe used to confirm entries, or null to disable the filter. */
     val htf: Timeframe? = null,
 )
@@ -42,6 +44,9 @@ data class BacktestRequest(
 object BacktestEngine {
 
     fun run(request: BacktestRequest): BacktestResult {
+        require(request.initialBalance.isFinite() && request.initialBalance > 0.0) {
+            "Số dư ban đầu không hợp lệ."
+        }
         val spec = MarketData.spec(request.symbol)
         val requested = request.bars.coerceIn(120, 1_800)
         val candles = MarketData.closedCandles(request.symbol, request.timeframe, requested)
@@ -56,6 +61,7 @@ object BacktestEngine {
             useHtf = request.htf != null,
         )
         val riskPercent = request.riskPercent.coerceIn(0.1, 5.0)
+        val leverage = request.leverage.coerceAtLeast(1)
 
         // Higher-timeframe series aligned to the same synthetic clock. The trend
         // is cached per HTF bar because evaluating a snapshot is not free.
@@ -94,9 +100,17 @@ object BacktestEngine {
         var cooldownUntil = startIndex
 
         val trades = ArrayList<BacktestTrade>()
-        val equity = ArrayList<Double>(candles.size - startIndex + 1)
+        val equity = ArrayList<Double>(candles.size - startIndex)
         equity.add(balance)
         var curveIndex = startIndex
+
+        fun appendEquity(value: Double) {
+            equity.add(value)
+            if (value > peak) peak = value
+            val dd = peak - value
+            if (dd > maxDdAbs) maxDdAbs = dd
+            if (peak > 0.0) maxDdPct = max(maxDdPct, dd / peak * 100.0)
+        }
 
         var i = startIndex
         while (i < candles.size - 1) {
@@ -132,9 +146,9 @@ object BacktestEngine {
                 entry = entry,
                 stopLoss = stop,
                 spec = spec,
-                leverage = 200,
+                leverage = leverage,
             )
-            val marginPerLot = spec.contractSize * entry / 200.0
+            val marginPerLot = spec.contractSize * entry / leverage.toDouble()
             if (marginPerLot > 0) {
                 lots = min(lots, balance * 0.8 / marginPerLot)
             }
@@ -155,7 +169,11 @@ object BacktestEngine {
                         break
                     }
                     if (bar.high >= target) {
-                        exitIndex = j; exitPrice = target; reason = CloseReason.TAKE_PROFIT; break
+                        exitIndex = j
+                        // A gap through the target fills at the open, not at the target.
+                        exitPrice = max(target, bar.open)
+                        reason = CloseReason.TAKE_PROFIT
+                        break
                     }
                 } else {
                     if (bar.high >= stop) {
@@ -165,7 +183,11 @@ object BacktestEngine {
                         break
                     }
                     if (bar.low <= target) {
-                        exitIndex = j; exitPrice = target; reason = CloseReason.TAKE_PROFIT; break
+                        exitIndex = j
+                        // A gap through the target fills at the open, not at the target.
+                        exitPrice = min(target, bar.open)
+                        reason = CloseReason.TAKE_PROFIT
+                        break
                     }
                 }
                 j++
@@ -179,7 +201,6 @@ object BacktestEngine {
             val profit = grossProfit(signal.side, entry, exitPrice, lots, spec)
             val commission = lots * request.commissionPerLot
             val net = profit - commission
-            balance += net
             trades.add(
                 BacktestTrade(
                     index = i,
@@ -198,20 +219,32 @@ object BacktestEngine {
                 )
             )
 
+            // Mark the position to market on every bar it is open so the
+            // equity curve and drawdown include floating P/L, not only the
+            // realised result at the exit bar.
+            val exitBalance = balance + net
             while (curveIndex < exitIndex) {
                 curveIndex++
-                equity.add(balance)
-                if (balance > peak) peak = balance
-                val dd = peak - balance
-                if (dd > maxDdAbs) maxDdAbs = dd
-                if (peak > 0) maxDdPct = max(maxDdPct, dd / peak * 100.0)
+                val mark = when {
+                    curveIndex < i + 1 -> balance
+                    curveIndex < exitIndex ->
+                        balance + grossProfit(signal.side, entry, candles[curveIndex].close, lots, spec)
+                    else -> exitBalance
+                }
+                appendEquity(mark)
             }
+            balance = exitBalance
             cooldownUntil = exitIndex + 3
             i = exitIndex + 2
         }
 
-        // Ensure the curve terminates on the final balance.
-        if (equity.lastOrNull() != balance) equity.add(balance)
+        // Complete the curve on every remaining bar so each point maps to a
+        // candle and the last value always equals the final realised balance.
+        val lastIndex = candles.size - 1
+        while (curveIndex < lastIndex) {
+            curveIndex++
+            appendEquity(balance)
+        }
 
         val metrics = metricsOf(
             initialBalance = request.initialBalance,

@@ -151,11 +151,15 @@
     <string name="trade_list">Danh sách lệnh</string>
     <string name="no_backtest">Chưa có kết quả. Chọn chiến lược và chạy backtest.</string>
     <string name="backtest_saved">Đã lưu kết quả vào lịch sử</string>
-    <string name="backtest_warmup">Cần tối thiểu 300 nến để chạy.</string>
+    <string name="backtest_warmup">Chọn tham số rồi chạy backtest.</string>
     <string name="backtest_running_bars">Đang mô phỏng %1$d nến…</string>
     <string name="backtest_done">Hoàn tất · %1$d lệnh · %2$s</string>
     <string name="backtest_failed">Backtest lỗi: %1$s</string>
     <string name="backtest_no_trades">Không có lệnh khớp điều kiện. Thử tắt HTF, tăng số nến hoặc chọn chiến lược khác.</string>
+    <string name="backtest_invalid_bars">Số nến phải là số nguyên từ 120 đến 1800</string>
+    <string name="backtest_invalid_balance">Số dư phải là số từ 100 USD trở lên</string>
+    <string name="backtest_invalid_risk">Rủi ro phải từ 0.1% đến 5.0%</string>
+    <string name="backtest_invalid_rr">Tỷ lệ R:R phải từ 0.5 đến 10.0</string>
     <string name="backtest_scroll_hint">Đã cuộn tới kết quả bên dưới.</string>
 
     <string name="terminal">Giao dịch</string>
@@ -198,6 +202,11 @@
     <string name="reason_signal">Tín hiệu chiến lược</string>
 
     <string name="settings_title">Cài đặt</string>
+    <string name="settings_mt5">Tài khoản MT5</string>
+    <string name="settings_mt5_logged_out">Chưa đăng nhập</string>
+    <string name="settings_mt5_hint">Phiên MT5 demo cục bộ · không kết nối máy chủ thật</string>
+    <string name="mt5_login_action">Đăng nhập MT5</string>
+    <string name="mt5_manage_action">Quản lý phiên MT5</string>
     <string name="settings_account">Tài khoản demo</string>
     <string name="settings_balance">Số dư ban đầu (USD)</string>
     <string name="settings_leverage">Đòn bẩy (1:x)</string>
