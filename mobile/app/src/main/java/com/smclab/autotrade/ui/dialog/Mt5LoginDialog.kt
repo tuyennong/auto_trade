@@ -4,7 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.smclab.autotrade.R
@@ -52,6 +54,7 @@ class Mt5LoginDialog : BottomSheetDialogFragment() {
         binding.ddMt5Server.setOnItemClickListener { _, _, position, _ ->
             servers.getOrNull(position)?.let { server ->
                 binding.ddMt5Server.setText(server, false)
+                binding.tilMt5Server.error = null
                 if (binding.etMt5Broker.text.isNullOrBlank()) {
                     binding.etMt5Broker.setText(server.substringBefore('-'))
                 }
@@ -61,6 +64,19 @@ class Mt5LoginDialog : BottomSheetDialogFragment() {
         binding.btnMt5Connect.setOnClickListener { submit() }
         binding.btnMt5Cancel.setOnClickListener { dismiss() }
         binding.btnMt5Logout.setOnClickListener { confirmLogout() }
+
+        binding.etMt5Login.doAfterTextChanged { binding.tilMt5Login.error = null }
+        binding.etMt5Password.doAfterTextChanged { binding.tilMt5Password.error = null }
+        binding.etMt5Login.doAfterTextChanged { binding.tvMt5Error.visibility = View.GONE }
+        binding.etMt5Password.doAfterTextChanged { binding.tvMt5Error.visibility = View.GONE }
+        binding.etMt5Password.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit()
+                true
+            } else {
+                false
+            }
+        }
 
         val account = AppRepository.account.value ?: Account()
         binding.etMt5Login.setText(account.login)
@@ -80,6 +96,7 @@ class Mt5LoginDialog : BottomSheetDialogFragment() {
         binding.tvMt5Error.visibility = View.GONE
         if (!connected) {
             binding.btnMt5Cancel.text = getString(R.string.cancel)
+            binding.etMt5Password.setText("")
             return
         }
         binding.btnMt5Cancel.text = getString(R.string.close)

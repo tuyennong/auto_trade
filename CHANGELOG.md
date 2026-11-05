@@ -14,6 +14,8 @@ Changes are recorded here before they are released. Entries describe completed w
 - Local commit validation covering Python, MQL5 static checks, MetaEditor compilation, detector runtime tests, language examples, and documentation links.
 - Shared Git hooks, commit-bound `local/validation` status publication, and contribution rules for small commits, frequent pushes, PR review, and squash merges into protected `main`.
 - Contributor conduct guidance, a private security reporting policy, and bug and feature request forms with reproducible environment and data requirements.
+- An MT5-style demo login panel in the Android settings, with persisted local session identity, server/broker fields, and logout.
+- Android backtest regression coverage for minimum and maximum history, every symbol, leverage, and invalid balance.
 
 ### Changed
 
@@ -26,6 +28,10 @@ Changes are recorded here before they are released. Entries describe completed w
 
 ### Fixed
 
+- The Android demo terminal's persisted repository layer, which a broad `data/` ignore rule had excluded from the repository; generated Android build outputs are now ignored as well.
+- Android backtest input errors are reported instead of silently falling back, rendering failures no longer crash the screen, and zero-trade runs explain which filters to relax.
+- Backtest equity and drawdown now mark open positions to market on every bar, take-profit gaps fill at the bar open, and the configured leverage caps position size.
+- Local Android builds no longer reserve 3 GB for Gradle plus a separate Kotlin daemon, which caused out-of-memory failures on small machines.
 - MQL5 compilation failures in the data-export script and sample EA, while preserving existing initialization, update, cleanup, and getter interfaces.
 - Zone state loss, unreachable breaker detection, and repeated liquidity-touch counting during updates.
 - Failure propagation, stale signal handling, resource cleanup, drawing-object ownership, and visualizer display settings.

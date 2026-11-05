@@ -10,7 +10,7 @@ kết nối broker, không có tài khoản MT5 và không định tuyến lện
 
 ## Tải và cài đặt
 
-APK đã build sẵn nằm trong `mobile/dist/`:
+APK build từ source nằm trong `mobile/dist/` (thư mục này không được commit):
 
 | File | Mục đích |
 | --- | --- |
@@ -22,7 +22,7 @@ Yêu cầu: Android 8.0 (API 26) trở lên, kiến trúc ARM/ARM64/x86 tùy thi
 Cài qua ADB:
 
 ```powershell
-adb install -r E:\AutoTrade\mobile\dist\smc-trader-1.0.0-release.apk
+adb install -r mobile\dist\smc-trader-1.0.0-release.apk
 ```
 
 Hoặc copy APK sang điện thoại và mở trực tiếp. Bản release dùng debug keystore để
@@ -63,10 +63,25 @@ tiện cài đặt nội bộ; khi phát hành chính thức cần thay bằng k
 ### Backtest
 - Chọn cặp, khung thời gian, chiến lược, số nến, balance, risk %, R:R.
 - Chọn khung xác nhận HTF hoặc **Không lọc HTF**.
+- Kiểm tra đầu vào chặt: số nến 120–1800, balance tối thiểu 100, risk 0.1–5%,
+  R:R 0.5–10. Lỗi nhập liệu hiển thị ngay dưới nút chạy.
 - Kết quả: net profit, return %, win rate, profit factor, max drawdown, expectancy,
   avg R, Sharpe, chuỗi thua, equity curve và danh sách lệnh gần nhất.
 - Quy tắc mô phỏng: tín hiệu trên nến đóng, khớp ở open nến kế tiếp, một vị thế tại
-  một thời điểm, ưu tiên SL trong nến, có phí commission.
+  một thời điểm, ưu tiên SL trong nến, khớp gap ở open, có phí commission.
+- Equity được đánh dấu theo từng nến đang mở (gồm P/L thả nổi) và drawdown tính cả
+  P/L thả nổi, không chỉ chốt lời/lỗ khi đóng lệnh.
+- Nếu không có lệnh khớp, ứng dụng gợi ý tắt HTF, tăng số nến hoặc đổi chiến lược.
+
+### Đăng nhập MT5 (demo)
+- Mở từ icon tài khoản trên thanh trên cùng, thanh thông tin tài khoản, hoặc
+  **Cài đặt → Tài khoản MT5**.
+- Nhập số tài khoản (4–12 chữ số), mật khẩu (tối thiểu 4 ký tự), chọn server và
+  broker; phiên demo được lưu cục bộ qua SharedPreferences.
+- Mật khẩu chỉ được kiểm tra độ dài trong phiên, không lưu lại. Đăng xuất giữ
+  nguyên balance, vị thế và lịch sử demo.
+- Đây là phiên mô phỏng: ứng dụng không xác thực với máy chủ MetaTrader và không
+  gửi thông tin đăng nhập ra mạng.
 
 ### Giao dịch
 - Tài khoản demo persist qua SharedPreferences.
@@ -117,9 +132,9 @@ app/build/outputs/apk/release/app-release.apk
 
 - `:app:compileDebugKotlin` — thành công.
 - `:app:assembleDebug` và `:app:assembleRelease` — thành công.
-- `:app:testDebugUnitTest` — 6 test engine/MTF/backtest thành công
-  (`EngineSmokeTest`).
-- `apksigner verify` — cả hai APK có chữ ký hợp lệ.
+- `:app:testDebugUnitTest` — 12 test JVM thành công: 7 test engine/MTF/backtest
+  (`EngineSmokeTest`) và 5 test biên/tham số backtest (`BacktestEdgeTest`).
+- `apksigner verify` — cả hai APK có chữ ký v2 hợp lệ.
 - `aapt dump badging` — `com.smclab.autotrade`, versionName `1.0.0`,
   minSdk 26, targetSdk 34, launcher `MainActivity`.
 
@@ -130,7 +145,8 @@ hành vi trên thiết bị.
 ## Giới hạn đã biết
 
 - Không kết nối MT5/broker; không có dữ liệu thị trường thật.
-- Không có đăng nhập, đồng bộ đám mây hay thông báo push.
+- Phiên MT5 chỉ là mô phỏng cục bộ: không xác thực tài khoản, không gửi dữ liệu ra
+  mạng. Không có đồng bộ đám mây hay thông báo push.
 - Dữ liệu tổng hợp có thể tạo tín hiệu đẹp hơn thị trường thật; chỉ dùng để kiểm
   tra logic và luồng UI.
 - Bản release ký bằng debug key, không phù hợp để phát hành lên store.

@@ -14,6 +14,7 @@ Detection uses closed candles and broker time. Numerical rules are explicit, con
 | Additional ICT patterns | Displacement, MSS, IFVG, BPR, previous-day/week and completed-session highs/lows, broker daily/weekly opening gaps, SMT divergence, and Power of Three |
 | Data access | `SmcConfig`, `SmcSnapshot`, per-concept readiness, stable record IDs, lifecycle states, UTF-8 JSON, and existing CSV export |
 | Examples | A snapshot-export EA that places no orders; six external-language JSON readers; existing visualizer and sample trading EA |
+| Android demo | An offline Kotlin terminal with synthetic quotes, SMC chart overlays, strategy and backtest screens, an MT5-style demo login, and demo order simulation; see [mobile](mobile/README.md) |
 | Optional analysis | Currency strength, historical-volatility analysis, Python training scripts, and ONNX utilities |
 
 ## Start in MT5
